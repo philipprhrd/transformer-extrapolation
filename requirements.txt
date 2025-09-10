@@ -1,0 +1,12 @@
+torch
+scikit-learn
+pandas
+matplotlib
+rtdl_revisiting_models
+torchmetrics
+ipykernel
+tensorboardX
+tqdm
+lightning
+optuna
+optuna-integration[pytorch_lightning]

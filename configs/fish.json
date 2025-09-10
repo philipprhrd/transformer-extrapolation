@@ -1,0 +1,11 @@
+{
+  "cont_features": [
+    "length_1",
+    "length_2",
+    "length_3",
+    "height",
+    "width"
+  ],
+  "cat_features": ["species"],
+  "labels": ["weight"]
+}
