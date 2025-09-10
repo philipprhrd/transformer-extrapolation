@@ -42,10 +42,10 @@ def objective(trial: optuna.trial.Trial) -> float:
     global args, cont_features, cat_features, labels
     
     # Hyperparameters to tune
-    n_blocks = trial.suggest_int("n_blocks", 3, 6)
-    lr = trial.suggest_float("lr", 1e-7, 1e-1, log=True)
-    weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-1, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
+    n_blocks = trial.suggest_int("n_blocks", 2, 4)  # Reduced range for stability
+    lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)  # Better learning rate range
+    weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)  # Better weight decay range
+    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])  # Common batch sizes
 
     # Load data module with the suggested batch_size
     dm = load_datamodule(args, cont_features, cat_features, labels, batch_size)
@@ -63,11 +63,12 @@ def objective(trial: optuna.trial.Trial) -> float:
     # Callbacks and logger
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    logger = TensorBoardLogger("runs", name="hyperparam", default_hp_metric=False)
+    experiment_name = f"{args.data}-hyperparam"
+    logger = TensorBoardLogger("runs", name=experiment_name, default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
         dirpath="artifacts",
-        filename=f"{args.data}-{logger.name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
+        filename=f"{experiment_name}-{logger.name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
         monitor="val/loss",
         mode="min",
         save_top_k=1
