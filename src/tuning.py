@@ -78,8 +78,7 @@ def objective(trial: optuna.trial.Trial) -> float:
     trainer = Trainer(
         max_epochs=50,
         callbacks=[early_stopping, ckpt_cb],
-        logger=logger,
-        devices="auto"
+        logger=logger
     )
 
     # Model

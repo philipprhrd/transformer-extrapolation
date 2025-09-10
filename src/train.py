@@ -81,8 +81,7 @@ if __name__ == "__main__":
     trainer = Trainer(
         max_epochs=args.max_epochs,
         callbacks=[early_stopping, ckpt_cb],
-        logger=logger,
-        devices="auto"
+        logger=logger
     )
 
     model = FeatureTokenizerTransformer(config)
