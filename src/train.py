@@ -67,11 +67,11 @@ if __name__ == "__main__":
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    logger = TensorBoardLogger("runs", name="ft_transformer_experiment", default_hp_metric=False)
+    logger = TensorBoardLogger("runs", name="finetuning", default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
         dirpath="artifacts",
-        filename=f"{logger.name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
+        filename=f"-{args.data}-{logger.name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
         monitor="val/loss",
         mode="min",
         save_top_k=1

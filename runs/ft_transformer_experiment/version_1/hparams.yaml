@@ -1,9 +1,0 @@
-config: !!python/object:src.model.FTConfig
-  cat_cardinalities:
-  - 3
-  d_out: 1
-  lr: 0.0001799
-  n_blocks: 4
-  n_cont_features: 7
-  rex_weight: 0.0
-  weight_decay: 0.01
