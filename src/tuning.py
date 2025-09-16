@@ -29,8 +29,8 @@ def get_args_parser():
     #parser.add_argument("--n_blocks", type=int, default=4, help="Number of FT Transformer blocks")
     #parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     #parser.add_argument("--weight_decay", type=float, default=1e-5, help="Weight decay")
-    #parser.add_argument("--max_epochs", type=int, default=100, help="Maximum number of training epochs")
-    parser.add_argument("--patience", type=int, default=32, help="Early stopping patience")
+    parser.add_argument("--max_epochs", type=int, default=100, help="Maximum number of training epochs")
+    parser.add_argument("--patience", type=int, default=3, help="Early stopping patience")
     #parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
 
     parser.add_argument("--mode", type=str, choices=["normal", "loco", "episodic"], default="normal", help="Training mode")
