@@ -22,14 +22,14 @@ class BaseDataModule(pl.LightningDataModule):
         self.n_clusters = n_clusters
         self.cluster_eval = cluster_eval
 
-        self.df = pd.read_csv(self.data)
-
-        #self.df, self.domain_mapping = load_domains(self.df, domain_cols=self.domain_cols)
-        #print(f"Identified {len(self.domain_mapping)} unique domains based on columns {self.domain_cols}")
+        self.df = self.load_data()
 
         train_df, val_df, test_df = self.split_data()
 
         self.create_datasets(train_df, val_df, test_df)
+
+    def load_data(self) -> pd.DataFrame:
+        return pd.read_csv(self.data)
 
     def create_datasets(self, train_df, val_df, test_df):
         self.train_ds = ERMDataset(
