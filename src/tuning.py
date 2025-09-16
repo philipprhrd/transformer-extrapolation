@@ -55,7 +55,7 @@ def objective(trial: optuna.trial.Trial) -> float:
     rex_weight = trial.suggest_float("rex_weight", 1, 10000, log=True)  # REx weight
 
     # Load data module with the suggested batch_size
-    dm = load_datamodule(args, cont_features, cat_features, labels)
+    dm = load_datamodule(args, batch_size, cont_features, cat_features, labels)
 
     # Model configuration
     config = FTConfig(
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         direction="minimize",
         sampler=sampler,
         pruner=pruner,
-        study_name=f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}-hyperparam"
+        study_name=f"{args.data}-{args.mode}-hyperparam"
     )
 
     study.optimize(objective, n_trials=100)

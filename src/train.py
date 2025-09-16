@@ -52,7 +52,7 @@ def get_args_parser():
     return parser
 
 
-def load_datamodule(args, cont_features, cat_features, labels):
+def load_datamodule(args, batch_size, cont_features, cat_features, labels):
     if args.custom:
         module = importlib.import_module(f"src.custom.{args.custom}")
         DataModuleClass = getattr(module, "CustomDataModule")
@@ -60,7 +60,7 @@ def load_datamodule(args, cont_features, cat_features, labels):
         return DataModuleClass(
             data=f"data/{args.data}.csv",
             num_workers=11, 
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             cont_features=cont_features,
             cat_features=cat_features,
             labels=labels
@@ -70,7 +70,7 @@ def load_datamodule(args, cont_features, cat_features, labels):
         return LOCODataModule(
             data=f"data/{args.data}.csv",
             num_workers=11, 
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             cont_features=cont_features,
             cat_features=cat_features,
             labels=labels,
@@ -82,7 +82,7 @@ def load_datamodule(args, cont_features, cat_features, labels):
     return BaseDataModule(
         data=f"data/{args.data}.csv",
         num_workers=11,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         cont_features=cont_features,
         cat_features=cat_features,
         labels=labels,
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
     cont_features, cat_features, labels = read_data_config(f"configs/{args.data}.json")
 
-    dm = load_datamodule(args, cont_features, cat_features, labels)
+    dm = load_datamodule(args, args.batch_size, cont_features, cat_features, labels)
 
     # Model configuration
 
