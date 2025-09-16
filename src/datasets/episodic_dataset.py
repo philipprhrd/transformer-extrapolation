@@ -1,9 +1,9 @@
 import torch
-from torch.utils.data import IterableDataset
+from torch.utils.data import Dataset
 from pandas import DataFrame
 from ..utils import preprocess_data
 
-class EpisodicDataset(IterableDataset):
+class EpisodicDataset(Dataset):
     def __init__(
         self,
         df: DataFrame,
@@ -36,6 +36,11 @@ class EpisodicDataset(IterableDataset):
         self.x_cont = torch.as_tensor(x_cont, dtype=torch.float32)
         self.x_cat = torch.as_tensor(x_cat, dtype=torch.long)
         self.y = torch.as_tensor(y, dtype=torch.float32)
+
+    def get_cardinalities(self):
+        if self.cat_encoders is None:
+            return []
+        return [len(encoder.classes_) for encoder in self.cat_encoders.values()]
 
     def __getitem__(self, index):
         return self.x_cont[index], self.x_cat[index], self.y[index], self.domain[index]

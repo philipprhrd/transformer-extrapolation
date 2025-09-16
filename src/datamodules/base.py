@@ -24,12 +24,12 @@ class BaseDataModule(pl.LightningDataModule):
 
         self.df = self.load_data()
 
-        train_df, val_df, test_df = self.split_data()
-
-        self.create_datasets(train_df, val_df, test_df)
-
     def load_data(self) -> pd.DataFrame:
         return pd.read_csv(self.data)
+    
+    def init(self):
+        train_df, val_df, test_df = self.split_data()
+        self.create_datasets(train_df, val_df, test_df)
 
     def create_datasets(self, train_df, val_df, test_df):
         self.train_ds = ERMDataset(

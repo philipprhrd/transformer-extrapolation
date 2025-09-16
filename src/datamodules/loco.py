@@ -56,7 +56,7 @@ class LOCODataModule(BaseDataModule):
         return train_df, val_df, test_df
     
     def create_datasets(self, train_df, val_df, test_df):
-        Dataset = ERMDataset#EpisodicDataset if self.dataset_type == "episodic" else 
+        Dataset = EpisodicDataset if self.dataset_type == "episodic" else ERMDataset
 
         self.train_ds = Dataset(
             df=train_df,
