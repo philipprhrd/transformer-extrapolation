@@ -5,8 +5,32 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning import Trainer
 from src.utils import read_data_config
 from src.datamodules import BaseDataModule, LOCODataModule
+import importlib
 
 def get_args_parser():
+    """Sample usage:
+
+    "Interpolation"-training with 1 cluster as extrapolation test:
+    
+    ``python -m src.train <...> --mode normal --cluster_eval <1..n_cluster>``
+
+    "LOCO"-training with 1 cluster as extrapolation test:
+
+    ``python -m src.train <...> --mode loco --cluster_eval <1..n_cluster>``
+
+    "LOCO"-training with REx:
+
+    ``python -m src.train <...> --mode loco --cluster_eval <1..n_cluster> --rex_weight <float>``
+
+    "LOCO"-training with episodic training (and REx):
+
+    ``python -m src.train <...> --mode episodic --cluster_eval <1..n_cluster> [--rex_weight <float>]``
+
+    Completely custom logic (you have to define all splits in a python file and pass the name here):
+
+    ``python -m src.train <...> --custom <python_file_name (in src/custom)>``
+    """
+
     parser = argparse.ArgumentParser(description="Train FT Transformer model")
     
     parser.add_argument("--data", type=str, required=True, help="Path to the training data file")
@@ -17,29 +41,55 @@ def get_args_parser():
     parser.add_argument("--patience", type=int, default=32, help="Early stopping patience")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
 
-    parser.add_argument("--dataset", type=str, choices=["erm", "loco"], default="erm", help="Type of dataset to use")
-    parser.add_argument("--split", type=str, choices=["random", "kmeans", "custom"], default="random", help="Type of split to use")
-    parser.add_argument("--domain_cols", type=list, default=[], help="List of domain columns")
+    parser.add_argument("--mode", type=str, choices=["normal", "loco", "episodic"], default="normal", help="Training mode")
+    #parser.add_argument("--use_kmeans", action="store_true", help="Use KMeans for splits")
+    parser.add_argument("--rex_weight", type=float, default=0.0, help="Use REx for training")
+    parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
+    parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters for LOCO mode")
+    parser.add_argument("--cluster_eval", type=int, default=None)
+
+    parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
     return parser
 
 
 def load_datamodule(args, cont_features, cat_features, labels):
-    if args.split in ["kmeans", "custom"]:
-        assert args.dataset == "loco", "LOCO dataset must be used with kmeans or custom split"
-        #return LOCODataModule(f"data/{args.data}.csv", dataset_type=args.dataset, num_workers=11, batch_size=args.batch_size)
-    else:
-        assert args.split == "random", "Only random split is supported for ERM dataset"
-        return BaseDataModule(
-            data=f"data/{args.data}.csv", 
-            dataset_type=args.dataset, 
+    if args.custom:
+        module = importlib.import_module(f"src.custom.{args.custom}")
+        DataModuleClass = getattr(module, "CustomDataModule")
+
+        return DataModuleClass(
+            data=f"data/{args.data}.csv",
+            num_workers=11, 
+            batch_size=args.batch_size,
+            cont_features=cont_features,
+            cat_features=cat_features,
+            labels=labels
+        )
+
+    if args.mode in ["loco", "episodic"]:
+        return LOCODataModule(
+            data=f"data/{args.data}.csv",
             num_workers=11, 
             batch_size=args.batch_size,
             cont_features=cont_features,
             cat_features=cat_features,
             labels=labels,
-            domain_cols=args.domain_cols,
+            n_clusters=args.n_clusters,
+            cluster_eval=args.cluster_eval,
+            dataset_type=args.mode
         )
+    
+    return BaseDataModule(
+        data=f"data/{args.data}.csv",
+        num_workers=11,
+        batch_size=args.batch_size,
+        cont_features=cont_features,
+        cat_features=cat_features,
+        labels=labels,
+        n_clusters=args.n_clusters,
+        cluster_eval=args.cluster_eval
+    )
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
@@ -58,7 +108,11 @@ if __name__ == "__main__":
         d_out=len(labels),
         n_blocks=args.n_blocks,
         lr=args.lr,
-        weight_decay=args.weight_decay
+        batch_size=args.batch_size,
+        weight_decay=args.weight_decay,
+        rex_weight=args.rex_weight,
+        rex_penalty_anneal_iters=args.rex_anneal_iters,
+        episodic=(args.mode == "episodic")
     )
 
     print("-- Config --")
@@ -67,12 +121,12 @@ if __name__ == "__main__":
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    experiment_name = f"{args.data}-finetuning"
+    experiment_name = f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}-finetuning"
     logger = TensorBoardLogger("runs", name=experiment_name, default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
-        dirpath="artifacts",
-        filename=f"{experiment_name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
+        dirpath=f"artifacts/{experiment_name}",
+        filename=f"{experiment_name}-best",
         monitor="val/loss",
         mode="min",
         save_top_k=1

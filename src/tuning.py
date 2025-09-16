@@ -13,7 +13,7 @@ def get_args_parser():
     parser.add_argument("--data", type=str, required=True, help="Path to the training data file")
     parser.add_argument("--patience", type=int, default=32, help="Early stopping patience")
     parser.add_argument("--dataset", type=str, choices=["erm", "loco"], default="erm", help="Type of dataset to use")
-    parser.add_argument("--split", type=str, choices=["random", "kmeans", "custom"], default="random", help="Type of split to use")
+    parser.add_argument("--split", type=str, choices=["random", "kmeans", "domain", "custom"], default="random", help="Type of split to use")
     parser.add_argument("--domain_cols", type=list, default=[], help="List of domain columns")
 
     return parser
@@ -63,12 +63,11 @@ def objective(trial: optuna.trial.Trial) -> float:
     # Callbacks and logger
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    experiment_name = f"{args.data}-hyperparam"
-    logger = TensorBoardLogger("runs", name=experiment_name, default_hp_metric=False)
+    logger = TensorBoardLogger("runs", name=trial.study.study_name, default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
-        dirpath="artifacts",
-        filename=f"{experiment_name}-{logger.name}-v{logger.version}"+"-{epoch:02d}-{val/loss:.4f}",
+        dirpath=f"artifacts/{trial.study.study_name}",
+        filename=f"{trial.study.study_name}-best-trial",
         monitor="val/loss",
         mode="min",
         save_top_k=1
@@ -115,7 +114,7 @@ if __name__ == "__main__":
         direction="minimize",
         sampler=sampler,
         pruner=pruner,
-        study_name="ft_transformer_tuning"
+        study_name=f"{args.data}-{args.dataset}-{args.split}-hyperparam"
     )
 
     study.optimize(objective, n_trials=100)
