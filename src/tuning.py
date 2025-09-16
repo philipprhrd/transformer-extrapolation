@@ -41,6 +41,8 @@ def get_args_parser():
 
     parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
+    parser.add_argument("--sampler", type=str, choices=["TPESampler", "GPSampler"], default="TPESampler", help="Optuna sampler")
+
     return parser
 
 def objective(trial: optuna.trial.Trial) -> float:
@@ -107,7 +109,10 @@ if __name__ == "__main__":
     
     print("Starting hyperparameter optimization...")
 
-    sampler = optuna.samplers.GPSampler(seed=1)
+    if args.sampler == "TPESampler":
+        sampler = optuna.samplers.TPESampler(seed=1)
+    else:
+        sampler = optuna.samplers.GPSampler(seed=1)
 
     pruner = optuna.pruners.MedianPruner(
         n_startup_trials=5,
