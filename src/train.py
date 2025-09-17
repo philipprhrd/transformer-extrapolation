@@ -1,6 +1,5 @@
 import argparse
 from src.model import FeatureTokenizerTransformer, FTConfig
-from src.episodic_model import EpisodicFeatureTokenizerTransformer, EpisodicFTConfig
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning import Trainer
@@ -71,7 +70,10 @@ def load_datamodule(args, batch_size, cont_features, cat_features, labels):
             batch_size=batch_size,
             cont_features=cont_features,
             cat_features=cat_features,
-            labels=labels
+            labels=labels,
+            n_clusters=args.n_clusters,
+            cluster_eval=args.cluster_eval,
+            dataset_type=args.mode
         )
 
     if args.mode in ["loco", "episodic"]:
@@ -107,40 +109,26 @@ if __name__ == "__main__":
 
     dm = load_datamodule(args, args.batch_size, cont_features, cat_features, labels)
     dm.init()
-    
+
     # Model configuration
 
-    if args.mode == "episodic":
-        config = EpisodicFTConfig(
-            n_cont_features=len(cont_features),
-            cat_cardinalities=dm.train_ds.get_cardinalities(),
-            d_out=len(labels),
-            n_blocks=args.n_blocks,
-            lr=args.lr,
-            batch_size=args.batch_size,
-            weight_decay=args.weight_decay,
-            rex_weight=args.rex_weight,
-            rex_penalty_anneal_iters=args.rex_anneal_iters,
-            episodic=True,
-            n_support=args.n_support,
-            n_query=args.n_query,
-            n_domains_per_episode=args.n_domains_per_episode,
-            inner_lr=args.inner_lr,
-            n_inner_steps=args.n_inner_steps
-        )
-    else:
-        config = FTConfig(
-            n_cont_features=len(cont_features),
-            cat_cardinalities=dm.train_ds.get_cardinalities(),
-            d_out=len(labels),
-            n_blocks=args.n_blocks,
-            lr=args.lr,
-            batch_size=args.batch_size,
-            weight_decay=args.weight_decay,
-            rex_weight=args.rex_weight,
-            rex_penalty_anneal_iters=args.rex_anneal_iters,
-            episodic=(args.mode == "episodic")
-        )
+    config = FTConfig(
+        n_cont_features=len(cont_features),
+        cat_cardinalities=dm.train_ds.get_cardinalities(),
+        d_out=len(labels),
+        n_blocks=args.n_blocks,
+        lr=args.lr,
+        batch_size=args.batch_size,
+        weight_decay=args.weight_decay,
+        rex_weight=args.rex_weight,
+        rex_penalty_anneal_iters=args.rex_anneal_iters,
+        episodic=(args.mode == "episodic"),
+        n_support=args.n_support if args.mode == "episodic" else 16,
+        n_query=args.n_query if args.mode == "episodic" else 16,
+        n_domains_per_episode=args.n_domains_per_episode if args.mode == "episodic" else 2,
+        inner_lr=args.inner_lr if args.mode == "episodic" else 1e-3,
+        n_inner_steps=args.n_inner_steps if args.mode == "episodic" else 5
+    )
 
     print("-- Config --")
     print(config)
@@ -165,10 +153,7 @@ if __name__ == "__main__":
         logger=logger
     )
 
-    if args.mode == "episodic":
-        model = EpisodicFeatureTokenizerTransformer(config)
-    else:
-        model = FeatureTokenizerTransformer(config)
+    model = FeatureTokenizerTransformer(config)
 
     # Training
 
