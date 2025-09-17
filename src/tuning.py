@@ -34,7 +34,7 @@ def get_args_parser():
     #parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
 
     parser.add_argument("--mode", type=str, choices=["normal", "loco", "episodic"], default="normal", help="Training mode")
-    #parser.add_argument("--rex_weight", type=float, default=0.0, help="Use REx for training")
+    parser.add_argument("--rex", action="store_true", help="Use REx for training")
     parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
     parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters for LOCO mode")
     parser.add_argument("--cluster_eval", type=int, default=None)
@@ -61,7 +61,7 @@ def objective(trial: optuna.trial.Trial) -> float:
     lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)  # Better learning rate range
     weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)  # Better weight decay range
     batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])  # Common batch sizes
-    rex_weight = trial.suggest_float("rex_weight", 1, 10000, log=True)  # REx weight
+    rex_weight = trial.suggest_float("rex_weight", 1, 10000, log=True) if args.rex else 0  # REx weight
 
     # Load data module with the suggested batch_size
     dm = load_datamodule(args, batch_size, cont_features, cat_features, labels)
