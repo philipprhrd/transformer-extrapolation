@@ -30,8 +30,22 @@ class BaseDataModule(pl.LightningDataModule):
         return pd.read_csv(self.data)
     
     def init(self):
+        # First fit categorical encoders on the entire dataset to ensure all categories are included
+        self.fit_categorical_encoders()
+        
         train_df, val_df, test_df = self.split_data()
         self.create_datasets(train_df, val_df, test_df)
+    
+    def fit_categorical_encoders(self):
+        """Fit categorical encoders on the entire dataset to include all categories"""
+        from sklearn.preprocessing import LabelEncoder
+        
+        self.cat_encoders = {}
+        for cat_feature in self.cat_features:
+            if cat_feature in self.df.columns:
+                encoder = LabelEncoder()
+                encoder.fit(self.df[cat_feature].to_numpy())
+                self.cat_encoders[cat_feature] = encoder
 
     def create_datasets(self, train_df, val_df, test_df):
         Dataset = EpisodicDataset if self.dataset_type == "episodic" else ERMDataset
@@ -41,7 +55,8 @@ class BaseDataModule(pl.LightningDataModule):
             cont_features=self.cont_features,
             cat_features=self.cat_features,
             labels=self.labels,
-            train=True
+            train=True,
+            cat_encoders=self.cat_encoders  # Pass pre-fitted categorical encoders
         )
 
         self.val_ds = Dataset(
@@ -52,7 +67,7 @@ class BaseDataModule(pl.LightningDataModule):
             train=False,
             feature_transformer=self.train_ds.feature_transformer,
             label_transformer=self.train_ds.label_transformer,
-            cat_encoders=self.train_ds.cat_encoders,
+            cat_encoders=self.cat_encoders,  # Use the same pre-fitted encoders
         )
 
         self.test_ds = Dataset(
@@ -63,7 +78,7 @@ class BaseDataModule(pl.LightningDataModule):
             train=False,
             feature_transformer=self.train_ds.feature_transformer,
             label_transformer=self.train_ds.label_transformer,
-            cat_encoders=self.train_ds.cat_encoders,
+            cat_encoders=self.cat_encoders,  # Use the same pre-fitted encoders
         )
 
     def split_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
