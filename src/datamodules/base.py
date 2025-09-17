@@ -5,11 +5,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import numpy as np
-from src.datasets import ERMDataset
+from src.datasets import ERMDataset, EpisodicDataset
 from src.utils import load_domains
 
 class BaseDataModule(pl.LightningDataModule):
-    def __init__(self, data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval):
+    def __init__(self, data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval, dataset_type):
         super().__init__()
         self.data = data
         self.cont_features = cont_features
@@ -22,6 +22,8 @@ class BaseDataModule(pl.LightningDataModule):
         self.n_clusters = n_clusters
         self.cluster_eval = cluster_eval
 
+        self.dataset_type = dataset_type
+
         self.df = self.load_data()
 
     def load_data(self) -> pd.DataFrame:
@@ -32,7 +34,9 @@ class BaseDataModule(pl.LightningDataModule):
         self.create_datasets(train_df, val_df, test_df)
 
     def create_datasets(self, train_df, val_df, test_df):
-        self.train_ds = ERMDataset(
+        Dataset = EpisodicDataset if self.dataset_type == "episodic" else ERMDataset
+
+        self.train_ds = Dataset(
             df=train_df,
             cont_features=self.cont_features,
             cat_features=self.cat_features,
@@ -40,7 +44,7 @@ class BaseDataModule(pl.LightningDataModule):
             train=True
         )
 
-        self.val_ds = ERMDataset(
+        self.val_ds = Dataset(
             df=val_df,
             cont_features=self.cont_features,
             cat_features=self.cat_features,
@@ -51,7 +55,7 @@ class BaseDataModule(pl.LightningDataModule):
             cat_encoders=self.train_ds.cat_encoders,
         )
 
-        self.test_ds = ERMDataset(
+        self.test_ds = Dataset(
             df=test_df,
             cont_features=self.cont_features,
             cat_features=self.cat_features,

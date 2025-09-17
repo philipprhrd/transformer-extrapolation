@@ -97,7 +97,8 @@ def load_datamodule(args, batch_size, cont_features, cat_features, labels):
         cat_features=cat_features,
         labels=labels,
         n_clusters=args.n_clusters,
-        cluster_eval=args.cluster_eval
+        cluster_eval=args.cluster_eval,
+        dataset_type=args.mode
     )
 
 if __name__ == "__main__":

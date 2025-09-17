@@ -39,6 +39,13 @@ def get_args_parser():
     parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters for LOCO mode")
     parser.add_argument("--cluster_eval", type=int, default=None)
 
+    # Episodic training parameters (with defaults for tuning)
+    parser.add_argument("--n_support", type=int, default=16, help="Number of support samples per domain per episode")
+    parser.add_argument("--n_query", type=int, default=16, help="Number of query samples per domain per episode")
+    parser.add_argument("--n_domains_per_episode", type=int, default=2, help="Number of domains to sample per episode")
+    parser.add_argument("--inner_lr", type=float, default=1e-3, help="Learning rate for inner optimization")
+    parser.add_argument("--n_inner_steps", type=int, default=5, help="Number of inner optimization steps")
+
     parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
     parser.add_argument("--sampler", type=str, choices=["TPESampler", "GPSampler"], default="TPESampler", help="Optuna sampler")
@@ -58,6 +65,7 @@ def objective(trial: optuna.trial.Trial) -> float:
 
     # Load data module with the suggested batch_size
     dm = load_datamodule(args, batch_size, cont_features, cat_features, labels)
+    dm.init()
 
     # Model configuration
     config = FTConfig(
@@ -70,7 +78,12 @@ def objective(trial: optuna.trial.Trial) -> float:
         weight_decay=weight_decay,
         rex_weight=rex_weight,
         rex_penalty_anneal_iters=args.rex_anneal_iters,
-        episodic=(args.mode == "episodic")
+        episodic=(args.mode == "episodic"),
+        n_support=args.n_support if args.mode == "episodic" else 16,
+        n_query=args.n_query if args.mode == "episodic" else 16,
+        n_domains_per_episode=args.n_domains_per_episode if args.mode == "episodic" else 2,
+        inner_lr=args.inner_lr if args.mode == "episodic" else 1e-3,
+        n_inner_steps=args.n_inner_steps if args.mode == "episodic" else 5
     )
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")

@@ -7,9 +7,7 @@ from sklearn.preprocessing import StandardScaler
 
 class LOCODataModule(BaseDataModule):
     def __init__(self, data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval, dataset_type):
-        super().__init__(data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval)
-
-        self.dataset_type = dataset_type
+        super().__init__(data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval, dataset_type)
 
     def split_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         if self.n_clusters < 3:
@@ -54,36 +52,3 @@ class LOCODataModule(BaseDataModule):
         print(f"Test: {len(test_df)} samples (1 cluster)")
         
         return train_df, val_df, test_df
-    
-    def create_datasets(self, train_df, val_df, test_df):
-        Dataset = EpisodicDataset if self.dataset_type == "episodic" else ERMDataset
-
-        self.train_ds = Dataset(
-            df=train_df,
-            cont_features=self.cont_features,
-            cat_features=self.cat_features,
-            labels=self.labels,
-            train=True
-        )
-
-        self.val_ds = Dataset(
-            df=val_df,
-            cont_features=self.cont_features,
-            cat_features=self.cat_features,
-            labels=self.labels,
-            train=False,
-            feature_transformer=self.train_ds.feature_transformer,
-            label_transformer=self.train_ds.label_transformer,
-            cat_encoders=self.train_ds.cat_encoders,
-        )
-
-        self.test_ds = Dataset(
-            df=test_df,
-            cont_features=self.cont_features,
-            cat_features=self.cat_features,
-            labels=self.labels,
-            train=False,
-            feature_transformer=self.train_ds.feature_transformer,
-            label_transformer=self.train_ds.label_transformer,
-            cat_encoders=self.train_ds.cat_encoders,
-        )
