@@ -137,7 +137,7 @@ if __name__ == "__main__":
         direction="minimize",
         sampler=sampler,
         pruner=pruner,
-        study_name=f"{args.data}-{args.mode}-hyperparam"
+        study_name=f"{args.data}-{args.mode}{'-rex' if args.rex else ''}-hyperparam"
     )
 
     study.optimize(objective, n_trials=100)
