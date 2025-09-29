@@ -3,6 +3,8 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import numpy as np
 import json
+import joblib
+import os
 from typing import List, Tuple
 
 def read_data_config(path: str):
@@ -93,8 +95,8 @@ def preprocess_data(
 
         x_cat = np.stack(encoded_cols, axis=1).astype(np.int64)
     else:
-        # No categorical features: create an empty array for compatibility
-        x_cat = np.empty((len(df), 0), dtype=np.int64)
+        # No categorical features: return None for FTTransformer compatibility
+        x_cat = None
 
     # Process labels
     y = df[labels].to_numpy()
@@ -118,4 +120,67 @@ def get_loco_split(
     for cross-validation from the algorithm here: https://doi.org/10.1039/C8ME00012C.
     """
     pass
+
+
+def save_scalers(feature_transformer, label_transformer, cat_encoders, save_dir: str):
+    """
+    Save the scalers to files for later reuse.
+    
+    Args:
+        feature_transformer: StandardScaler for continuous features
+        label_transformer: StandardScaler for labels
+        cat_encoders: Dictionary of LabelEncoders for categorical features
+        save_dir: Directory to save the scalers
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save feature scaler
+    if feature_transformer is not None:
+        joblib.dump(feature_transformer, os.path.join(save_dir, "feature_scaler.pkl"))
+        print(f"Saved feature scaler to {os.path.join(save_dir, 'feature_scaler.pkl')}")
+    
+    # Save label scaler
+    if label_transformer is not None:
+        joblib.dump(label_transformer, os.path.join(save_dir, "label_scaler.pkl"))
+        print(f"Saved label scaler to {os.path.join(save_dir, 'label_scaler.pkl')}")
+    
+    # Save categorical encoders
+    if cat_encoders is not None and len(cat_encoders) > 0:
+        joblib.dump(cat_encoders, os.path.join(save_dir, "cat_encoders.pkl"))
+        print(f"Saved categorical encoders to {os.path.join(save_dir, 'cat_encoders.pkl')}")
+
+
+def load_scalers(save_dir: str):
+    """
+    Load the saved scalers from files.
+    
+    Args:
+        save_dir: Directory containing the saved scalers
+        
+    Returns:
+        Tuple of (feature_transformer, label_transformer, cat_encoders)
+    """
+    feature_transformer = None
+    label_transformer = None
+    cat_encoders = None
+    
+    # Load feature scaler
+    feature_scaler_path = os.path.join(save_dir, "feature_scaler.pkl")
+    if os.path.exists(feature_scaler_path):
+        feature_transformer = joblib.load(feature_scaler_path)
+        print(f"Loaded feature scaler from {feature_scaler_path}")
+    
+    # Load label scaler
+    label_scaler_path = os.path.join(save_dir, "label_scaler.pkl")
+    if os.path.exists(label_scaler_path):
+        label_transformer = joblib.load(label_scaler_path)
+        print(f"Loaded label scaler from {label_scaler_path}")
+    
+    # Load categorical encoders
+    cat_encoders_path = os.path.join(save_dir, "cat_encoders.pkl")
+    if os.path.exists(cat_encoders_path):
+        cat_encoders = joblib.load(cat_encoders_path)
+        print(f"Loaded categorical encoders from {cat_encoders_path}")
+    
+    return feature_transformer, label_transformer, cat_encoders
     

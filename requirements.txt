@@ -15,3 +15,5 @@ lightning
 optuna
 optuna-integration[pytorch_lightning]
 importlib
+onnx
+onnxscript

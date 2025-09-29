@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 from src.datasets import ERMDataset, EpisodicDataset
+from src.datasets.erm_dataset import custom_collate_fn
 from src.utils import load_domains
 
 class BaseDataModule(pl.LightningDataModule):
@@ -70,7 +71,8 @@ class BaseDataModule(pl.LightningDataModule):
             cat_encoders=self.cat_encoders,  # Use the same pre-fitted encoders
         )
 
-        self.test_ds = Dataset(
+        if test_df is not None:
+            self.test_ds = Dataset(
             df=test_df,
             cont_features=self.cont_features,
             cat_features=self.cat_features,
@@ -136,7 +138,8 @@ class BaseDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            persistent_workers=True
+            persistent_workers=True,
+            collate_fn=custom_collate_fn
         )
     
     def val_dataloader(self):
@@ -145,7 +148,8 @@ class BaseDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            persistent_workers=True
+            persistent_workers=True,
+            collate_fn=custom_collate_fn
         )
     
     def test_dataloader(self):
@@ -154,5 +158,6 @@ class BaseDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            persistent_workers=True
-        )
+            persistent_workers=True,
+            collate_fn=custom_collate_fn
+        ) if self.test_ds else None

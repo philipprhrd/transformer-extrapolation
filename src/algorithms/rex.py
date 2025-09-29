@@ -66,14 +66,24 @@ class RExAlgorithm:
         
         # If only one environment, return mean loss
         if len(unique_envs) <= 1:
-            return sample_losses.mean().unsqueeze(0)
+            if sample_losses.dim() > 1:
+                return sample_losses.view(sample_losses.size(0), -1).mean().unsqueeze(0)
+            else:
+                return sample_losses.mean().unsqueeze(0)
         
         # Compute per-environment losses efficiently
         env_losses = torch.zeros(len(unique_envs), device=predictions.device, dtype=predictions.dtype)
         env_counts = torch.bincount(inverse_indices)
         
+        # Flatten sample losses to 1D if needed (to handle multi-dimensional loss outputs)
+        if sample_losses.dim() > 1:
+            # Take mean over all dimensions except the batch dimension
+            sample_losses_flat = sample_losses.view(sample_losses.size(0), -1).mean(dim=1)
+        else:
+            sample_losses_flat = sample_losses
+        
         # Expand sample losses for vectorized computation
-        sample_losses_expanded = sample_losses.unsqueeze(0).expand(len(unique_envs), -1)
+        sample_losses_expanded = sample_losses_flat.unsqueeze(0).expand(len(unique_envs), -1)
         env_mask = (inverse_indices.unsqueeze(0) == torch.arange(len(unique_envs), device=predictions.device).unsqueeze(1))
         
         # Compute mean loss per environment

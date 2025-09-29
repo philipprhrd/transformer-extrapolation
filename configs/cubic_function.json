@@ -1,0 +1,7 @@
+{
+  "cont_features": [
+    "x_obs"
+  ],
+  "cat_features": [],
+  "labels": ["y"]
+}

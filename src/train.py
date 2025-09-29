@@ -3,9 +3,11 @@ from src.model import FeatureTokenizerTransformer, FTConfig
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning import Trainer
-from src.utils import read_data_config
+from src.utils import read_data_config, save_scalers
 from src.datamodules import BaseDataModule, LOCODataModule
 import importlib
+import torch
+import pytorch_lightning as pl
 
 def get_args_parser():
     """Sample usage:
@@ -41,18 +43,23 @@ def get_args_parser():
     parser.add_argument("--patience", type=int, default=32, help="Early stopping patience")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
 
-    parser.add_argument("--mode", type=str, choices=["normal", "loco", "episodic"], default="normal", help="Training mode")
-    parser.add_argument("--rex_weight", type=float, default=0.0, help="Use REx for training")
-    parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
+    parser.add_argument("--mode", type=str, choices=["normal", "loco"], default="normal", help="Training mode")
     parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters for LOCO mode")
     parser.add_argument("--cluster_eval", type=int, default=None)
+    
+    # REx
+    parser.add_argument("--rex_weight", type=float, default=0.0, help="Use REx for training")
+    parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
 
-    # Episodic training parameters
-    parser.add_argument("--n_support", type=int, default=16, help="Number of support samples per domain per episode")
-    parser.add_argument("--n_query", type=int, default=16, help="Number of query samples per domain per episode")
-    parser.add_argument("--n_domains_per_episode", type=int, default=2, help="Number of domains to sample per episode")
-    parser.add_argument("--inner_lr", type=float, default=1e-3, help="Learning rate for inner optimization")
-    parser.add_argument("--n_inner_steps", type=int, default=5, help="Number of inner optimization steps")
+    # IRM
+    parser.add_argument("--irm_weight", type=int, default=16, help="Number of support samples per domain per episode")
+    parser.add_argument("--irm_anneal_iters", type=int, default=280, help="Number of iterations to anneal IRM weight")
+
+    # IB IRM
+    parser.add_argument("--ib_weight", type=int, default=16, help="Number of support samples per domain per episode")
+    parser.add_argument("--ib_anneal_iters", type=int, default=280, help="Number of iterations to anneal IB weight")
+
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 
     parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
@@ -104,6 +111,8 @@ def load_datamodule(args, batch_size, cont_features, cat_features, labels):
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
 
+    pl.seed_everything(args.seed)
+
     # Data loading
 
     cont_features, cat_features, labels = read_data_config(f"configs/{args.data}.json")
@@ -123,12 +132,10 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
         rex_weight=args.rex_weight,
         rex_penalty_anneal_iters=args.rex_anneal_iters,
-        episodic=(args.mode == "episodic"),
-        n_support=args.n_support if args.mode == "episodic" else 16,
-        n_query=args.n_query if args.mode == "episodic" else 16,
-        n_domains_per_episode=args.n_domains_per_episode if args.mode == "episodic" else 2,
-        inner_lr=args.inner_lr if args.mode == "episodic" else 1e-3,
-        n_inner_steps=args.n_inner_steps if args.mode == "episodic" else 5
+        irm_weight=args.irm_weight,
+        ib_weight=args.ib_weight,
+        irm_penalty_anneal_iters=args.irm_anneal_iters,
+        ib_penalty_anneal_iters=args.ib_anneal_iters
     )
 
     print("-- Config --")
@@ -137,7 +144,7 @@ if __name__ == "__main__":
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    experiment_name = f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}-finetuning"
+    experiment_name = f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}{'-irm' if args.irm_weight > 0 else ''}{'-ib' if args.ib_weight > 0 else ''}-finetuning"
     logger = TensorBoardLogger("runs", name=experiment_name, default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
@@ -164,3 +171,13 @@ if __name__ == "__main__":
 
     best_path = ckpt_cb.best_model_path
     print(f"Best model path: {best_path}")
+
+    # Save scalers for later reuse
+    scaler_save_dir = f"artifacts/{experiment_name}"
+    save_scalers(
+        feature_transformer=dm.train_ds.feature_transformer,
+        label_transformer=dm.train_ds.label_transformer,
+        cat_encoders=dm.train_ds.cat_encoders,
+        save_dir=scaler_save_dir
+    )
+    print(f"Scalers saved to {scaler_save_dir}")
