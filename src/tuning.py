@@ -26,25 +26,21 @@ def get_args_parser():
     parser = argparse.ArgumentParser(description="Train FT Transformer model")
     
     parser.add_argument("--data", type=str, required=True, help="Path to the training data file")
-    #parser.add_argument("--n_blocks", type=int, default=4, help="Number of FT Transformer blocks")
-    #parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    #parser.add_argument("--weight_decay", type=float, default=1e-5, help="Weight decay")
+    parser.add_argument("--n_blocks", type=int, default=None, help="Number of transformer blocks (if None, will be tuned)")
     parser.add_argument("--max_epochs", type=int, default=100, help="Maximum number of training epochs")
     parser.add_argument("--patience", type=int, default=3, help="Early stopping patience")
-    #parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
-
-    parser.add_argument("--mode", type=str, choices=["normal", "loco", "episodic"], default="normal", help="Training mode")
-    parser.add_argument("--rex", action="store_true", help="Use REx for training")
-    parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
+    parser.add_argument("--mode", type=str, choices=["normal", "loco"], default="normal", help="Training mode")
     parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters for LOCO mode")
     parser.add_argument("--cluster_eval", type=int, default=None)
 
-    # Episodic training parameters (with defaults for tuning)
-    parser.add_argument("--n_support", type=int, default=16, help="Number of support samples per domain per episode")
-    parser.add_argument("--n_query", type=int, default=16, help="Number of query samples per domain per episode")
-    parser.add_argument("--n_domains_per_episode", type=int, default=2, help="Number of domains to sample per episode")
-    parser.add_argument("--inner_lr", type=float, default=1e-3, help="Learning rate for inner optimization")
-    parser.add_argument("--n_inner_steps", type=int, default=5, help="Number of inner optimization steps")
+    # REx
+    parser.add_argument("--rex", action="store_true", help="Use REx for training")
+
+    # IRM
+    parser.add_argument("--irm", action="store_true", help="Use IRM for training")
+
+    # IB IRM
+    parser.add_argument("--ib", action="store_true", help="Use IB for training")
 
     parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
@@ -53,15 +49,16 @@ def get_args_parser():
     return parser
 
 def objective(trial: optuna.trial.Trial) -> float:
-    # Get global args (this will be set in main)
     global args, cont_features, cat_features, labels
     
     # Hyperparameters to tune
-    n_blocks = trial.suggest_int("n_blocks", 2, 4)  # Reduced range for stability
+    n_blocks = trial.suggest_int("n_blocks", 2, 4) if args.n_blocks is None else args.n_blocks  # Reduced range for stability
     lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)  # Better learning rate range
     weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)  # Better weight decay range
-    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])  # Common batch sizes
-    rex_weight = trial.suggest_float("rex_weight", 1, 10000, log=True) if args.rex else 0  # REx weight
+    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256, 512])  # Common batch sizes
+    rex_weight = trial.suggest_float("rex_weight", 0.1, 100, log=True) if args.rex else 0.0 # REx weight
+    irm_weight = trial.suggest_float("irm_weight", 1, 10000, log=True) if args.irm else 0.0 # IRM weight
+    ib_irm_weight = trial.suggest_float("ib_irm_weight", 0.01, 10, log=True) if args.ib else 0.0 # IB-IRM weight
 
     # Load data module with the suggested batch_size
     dm = load_datamodule(args, batch_size, cont_features, cat_features, labels)
@@ -77,13 +74,11 @@ def objective(trial: optuna.trial.Trial) -> float:
         batch_size=batch_size,
         weight_decay=weight_decay,
         rex_weight=rex_weight,
-        rex_penalty_anneal_iters=args.rex_anneal_iters,
-        episodic=(args.mode == "episodic"),
-        n_support=args.n_support if args.mode == "episodic" else 16,
-        n_query=args.n_query if args.mode == "episodic" else 16,
-        n_domains_per_episode=args.n_domains_per_episode if args.mode == "episodic" else 2,
-        inner_lr=args.inner_lr if args.mode == "episodic" else 1e-3,
-        n_inner_steps=args.n_inner_steps if args.mode == "episodic" else 5
+        rex_penalty_anneal_iters=280,
+        irm_weight=irm_weight,
+        ib_weight=ib_irm_weight,
+        irm_penalty_anneal_iters=280,
+        ib_penalty_anneal_iters=280
     )
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
@@ -116,7 +111,6 @@ def objective(trial: optuna.trial.Trial) -> float:
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
     
-    # Load data configuration - make these global so objective function can access them
     global cont_features, cat_features, labels
     cont_features, cat_features, labels = read_data_config(f"configs/{args.data}.json")
     
@@ -137,7 +131,7 @@ if __name__ == "__main__":
         direction="minimize",
         sampler=sampler,
         pruner=pruner,
-        study_name=f"{args.data}-{args.mode}{'-rex' if args.rex else ''}-hyperparam"
+        study_name=f"{args.data}-{args.mode}{'-rex' if args.rex else ''}{'-irm' if args.irm else ''}{'-ib' if args.ib else ''}-hyperparam"
     )
 
     study.optimize(objective, n_trials=100)

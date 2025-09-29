@@ -1,4 +1,5 @@
-from .episodic import EpisodicAlgorithm
+from .algorithm import BaseAlgorithm, ErmAlgorithm
 from .rex import RExAlgorithm
+from .ib_irm import IBIRMAlgorithm
 
-__all__ = ["EpisodicAlgorithm", "RExAlgorithm"]
+__all__ = ["BaseAlgorithm", "ErmAlgorithm", "RExAlgorithm", "IBIRMAlgorithm"]

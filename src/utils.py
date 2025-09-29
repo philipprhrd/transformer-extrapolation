@@ -3,7 +3,9 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import numpy as np
 import json
+import joblib
 from typing import List, Tuple
+import os
 
 def read_data_config(path: str):
     with open(path, "r") as f:
@@ -107,15 +109,29 @@ def preprocess_data(
     return x_cont, x_cat, y, feature_transformer, label_transformer, cat_encoders
 
 
-def get_loco_split(
-    df: pd.DataFrame, 
-    n_splits: int = 3, 
-    klims: tuple = (3, 10), 
-    n_folds: int = 10
-) -> list:
+def save_scalers(feature_transformer, label_transformer, cat_encoders, save_dir: str):
     """
-    Get the Leave-One-Cluster-Out (LOCO) splits 
-    for cross-validation from the algorithm here: https://doi.org/10.1039/C8ME00012C.
-    """
-    pass
+    Save the scalers to files for later reuse.
     
+    Args:
+        feature_transformer: StandardScaler for continuous features
+        label_transformer: StandardScaler for labels
+        cat_encoders: Dictionary of LabelEncoders for categorical features
+        save_dir: Directory to save the scalers
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save feature scaler
+    if feature_transformer is not None:
+        joblib.dump(feature_transformer, os.path.join(save_dir, "feature_scaler.pkl"))
+        print(f"Saved feature scaler to {os.path.join(save_dir, 'feature_scaler.pkl')}")
+    
+    # Save label scaler
+    if label_transformer is not None:
+        joblib.dump(label_transformer, os.path.join(save_dir, "label_scaler.pkl"))
+        print(f"Saved label scaler to {os.path.join(save_dir, 'label_scaler.pkl')}")
+    
+    # Save categorical encoders
+    if cat_encoders is not None and len(cat_encoders) > 0:
+        joblib.dump(cat_encoders, os.path.join(save_dir, "cat_encoders.pkl"))
+        print(f"Saved categorical encoders to {os.path.join(save_dir, 'cat_encoders.pkl')}")

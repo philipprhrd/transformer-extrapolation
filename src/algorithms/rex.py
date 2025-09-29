@@ -1,89 +1,16 @@
-"""
-Risk Extrapolation (REx) algorithm for domain generalization.
-"""
 import torch
 from torch import nn
 from typing import Optional
+from .algorithm import BaseAlgorithm
 
-
-class RExAlgorithm:
-    """
-    Implements Risk Extrapolation (REx) for domain generalization.
-    
-    REx adds a penalty term that encourages the model to perform 
-    consistently across different environments/domains.
-    """
-    
+class RExAlgorithm(BaseAlgorithm):    
     def __init__(
         self,
         rex_weight: float = 1.0,
         rex_penalty_anneal_iters: int = 100
     ):
-        """
-        Args:
-            rex_weight: Weight for the REx penalty term
-            rex_penalty_anneal_iters: Number of iterations before applying full penalty
-        """
         self.rex_weight = rex_weight
         self.rex_penalty_anneal_iters = rex_penalty_anneal_iters
-    
-    def _compute_per_env_losses(
-        self,
-        predictions: torch.Tensor,
-        targets: torch.Tensor,
-        environments: torch.Tensor,
-        base_loss_fn: nn.Module
-    ) -> torch.Tensor:
-        """
-        Compute per-environment losses
-        
-        Args:
-            predictions: Model predictions
-            targets: Ground truth targets
-            environments: Environment/domain IDs for each sample
-            base_loss_fn: Base loss function
-            
-        Returns:
-            Tensor of per-environment losses
-        """
-        # Compute per-sample losses
-        if len(predictions.shape) == 1:
-            # Regression case - add dimension for consistent processing
-            sample_losses = base_loss_fn(predictions.unsqueeze(-1), targets.unsqueeze(-1)).squeeze(-1)
-        else:
-            # For other cases, compute loss reduction='none' to get per-sample losses
-            if hasattr(base_loss_fn, 'reduction'):
-                original_reduction = base_loss_fn.reduction
-                base_loss_fn.reduction = 'none'
-                sample_losses = base_loss_fn(predictions, targets)
-                base_loss_fn.reduction = original_reduction
-            else:
-                # Fallback for custom loss functions
-                sample_losses = torch.sum((predictions - targets) ** 2, dim=-1)
-        
-        # Get unique environments and their indices
-        unique_envs, inverse_indices = torch.unique(environments, return_inverse=True)
-        
-        # If only one environment, return mean loss
-        if len(unique_envs) <= 1:
-            return sample_losses.mean().unsqueeze(0)
-        
-        # Compute per-environment losses efficiently
-        env_losses = torch.zeros(len(unique_envs), device=predictions.device, dtype=predictions.dtype)
-        env_counts = torch.bincount(inverse_indices)
-        
-        # Expand sample losses for vectorized computation
-        sample_losses_expanded = sample_losses.unsqueeze(0).expand(len(unique_envs), -1)
-        env_mask = (inverse_indices.unsqueeze(0) == torch.arange(len(unique_envs), device=predictions.device).unsqueeze(1))
-        
-        # Compute mean loss per environment
-        env_losses = (sample_losses_expanded * env_mask.float()).sum(dim=1) / env_counts.float()
-        
-        # Remove environments with no samples (if any)
-        valid_envs = env_counts > 0
-        env_losses = env_losses[valid_envs]
-        
-        return env_losses
 
     def compute_loss(
         self,

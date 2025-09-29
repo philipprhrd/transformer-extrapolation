@@ -1,4 +1,3 @@
-from src.datasets import ERMDataset, EpisodicDataset
 from .base import BaseDataModule
 import pandas as pd
 import numpy as np
@@ -7,7 +6,9 @@ from sklearn.preprocessing import StandardScaler
 
 class LOCODataModule(BaseDataModule):
     def __init__(self, data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval, dataset_type):
-        super().__init__(data, cont_features, cat_features, labels, num_workers, batch_size, n_clusters, cluster_eval, dataset_type)
+        super().__init__(data, cont_features, cat_features, labels, num_workers, batch_size, dataset_type)
+        self.n_clusters = n_clusters
+        self.cluster_eval = cluster_eval
 
     def split_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         if self.n_clusters < 3:
