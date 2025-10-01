@@ -93,15 +93,26 @@ class FeatureTokenizerTransformer(pl.LightningModule):
             features = None
         
         # Compute loss using the algorithm
-        loss = self.algorithm.compute_loss(
-            predictions, y, e, self.loss_fn, 
-            self.update_count.item(), features=features
-        )
-        
-        # Compute and log penalty terms
-        penalty = self.algorithm.compute_penalty(
-            predictions, y, e, self.loss_fn, features=features
-        )
+        if isinstance(self.algorithm, RExAlgorithm):
+            loss = self.algorithm.compute_loss(
+                predictions, y, e, self.loss_fn, 
+                self.update_count.item()
+            )
+            
+            # Compute and log penalty terms
+            penalty = self.algorithm.compute_penalty(
+                predictions, y, e, self.loss_fn
+            )
+        else:
+            loss = self.algorithm.compute_loss(
+                predictions, y, e, self.loss_fn, 
+                self.update_count.item(), features=features
+            )
+            
+            # Compute and log penalty terms
+            penalty = self.algorithm.compute_penalty(
+                predictions, y, e, self.loss_fn, features=features
+            )
         
         # Log penalty terms based on algorithm type
         if self.config.rex_weight > 0:

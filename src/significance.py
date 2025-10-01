@@ -28,11 +28,11 @@ def get_args_parser():
     parser.add_argument("--rex_anneal_iters", type=int, default=280, help="Number of iterations to anneal REx weight")
 
     # IRM
-    parser.add_argument("--irm_weight", type=int, default=0.0, help="Number of support samples per domain per episode")
+    parser.add_argument("--irm_weight", type=float, default=0.0, help="Number of support samples per domain per episode")
     parser.add_argument("--irm_anneal_iters", type=int, default=280, help="Number of iterations to anneal IRM weight")
 
     # IB IRM
-    parser.add_argument("--ib_weight", type=int, default=0.0, help="Number of support samples per domain per episode")
+    parser.add_argument("--ib_weight", type=float, default=0.0, help="Number of support samples per domain per episode")
     parser.add_argument("--ib_anneal_iters", type=int, default=280, help="Number of iterations to anneal IB weight")
 
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
@@ -104,14 +104,28 @@ if __name__ == "__main__":
     global cont_features, cat_features, labels
     cont_features, cat_features, labels = read_data_config(f"configs/{args.data}.json")
     
-    # ltt-normal
     comparison_values = [
-
+14.205209,
+13.597524,
+14.022445,
+13.823618,
+13.576504,
+13.794117,
+14.458971,
+13.920672,
+13.640601,
+14.036467,
+13.494765,
+13.620354,
+13.975441,
+14.038516,
+14.074393,
+13.815199,
+13.848504,
+14.182647,
+13.700654,
+13.643946
     ]
-
-    # ltt-normal-rex
-#     comparison_values = [
-#     ]
     
     print("Starting significance testing with 20 iterations...")
 
@@ -135,7 +149,7 @@ if __name__ == "__main__":
     print(f"Number of iterations completed: {len(loss_values)}")
     print("\nAll loss values:")
     for i, loss in enumerate(loss_values):
-        print(f"  Seed {i}: {loss:.6f}")
+        print(f"{loss:.6f}")
     
     print(f"\nStatistics:")
     print(f"  Mean loss: {sum(loss_values)/len(loss_values):.6f}")
