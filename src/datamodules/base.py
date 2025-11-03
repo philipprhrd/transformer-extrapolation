@@ -74,9 +74,10 @@ class BaseDataModule(pl.LightningDataModule):
 
     def split_data(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         train_df = self.df[self.df["split"] == "train"]
-        val_df = self.df[self.df["split"] == "test"]
-        
-        return train_df, val_df, None
+        val_df = self.df[self.df["split"] == "val"]
+        test_df = self.df[self.df["split"] == "test"]
+
+        return train_df, val_df, test_df
 
     def train_dataloader(self):
         return DataLoader(

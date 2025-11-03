@@ -1,0 +1,8 @@
+{
+  "cont_features": [
+    "X_obs",
+    "x_bias"
+  ],
+  "cat_features": ["a"],
+  "labels": ["y"]
+}

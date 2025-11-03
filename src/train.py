@@ -166,5 +166,9 @@ if __name__ == "__main__":
 
     # Post training
 
+    trainer.test(model, dm)
+
+    # Post test
+
     best_path = ckpt_cb.best_model_path
     print(f"Best model path: {best_path}")
