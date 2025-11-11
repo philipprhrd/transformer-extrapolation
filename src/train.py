@@ -6,7 +6,6 @@ from pytorch_lightning import Trainer
 from src.utils import read_data_config
 from src.datamodules import BaseDataModule, LOCODataModule
 import importlib
-import torch
 import pytorch_lightning as pl
 
 def get_args_parser():

@@ -1,5 +1,4 @@
 import pandas as pd
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import numpy as np
 import json
@@ -38,23 +37,6 @@ def preprocess_data(
     label_transformer=None,
     cat_encoders=None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, StandardScaler, StandardScaler, dict]:
-    """
-    Preprocess data by scaling continuous features, encoding categorical features, and scaling labels.
-    
-    Args:
-        df: Input DataFrame
-        cont_features: List of continuous feature column names
-        cat_features: List of categorical feature column names
-        labels: List of label column names
-        train: Whether this is training data (fit transformers) or test data (use existing transformers)
-        feature_transformer: Existing StandardScaler for features (if train=False)
-        label_transformer: Existing StandardScaler for labels (if train=False)
-        cat_encoders: Existing categorical encoders dict (if train=False)
-    
-    Returns:
-        Tuple of (x_cont, x_cat, y, feature_transformer, label_transformer, cat_encoders)
-    """
-    
     # Create transformers if not provided
     if feature_transformer is None:
         feature_transformer = StandardScaler()
@@ -110,15 +92,6 @@ def preprocess_data(
 
 
 def save_scalers(feature_transformer, label_transformer, cat_encoders, save_dir: str):
-    """
-    Save the scalers to files for later reuse.
-    
-    Args:
-        feature_transformer: StandardScaler for continuous features
-        label_transformer: StandardScaler for labels
-        cat_encoders: Dictionary of LabelEncoders for categorical features
-        save_dir: Directory to save the scalers
-    """
     os.makedirs(save_dir, exist_ok=True)
     
     # Save feature scaler

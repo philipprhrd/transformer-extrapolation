@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from typing import Optional, cast, List
-import torch.nn.functional as F
-from torch.utils.checkpoint import checkpoint
 import torch
 import pytorch_lightning as pl
 from torch import Tensor, nn, optim
