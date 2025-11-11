@@ -127,6 +127,7 @@ if __name__ == "__main__":
         lr=args.lr,
         batch_size=args.batch_size,
         weight_decay=args.weight_decay,
+        coeffs=[0.0, 0.0, -1.0],
         rex_weight=args.rex_weight,
         rex_penalty_anneal_iters=args.rex_anneal_iters,
         irm_weight=args.irm_weight,
@@ -141,7 +142,7 @@ if __name__ == "__main__":
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    experiment_name = f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}{'-irm' if args.irm_weight > 0 else ''}{'-ib' if args.ib_weight > 0 else ''}-finetuning"
+    experiment_name = f"{args.data}-{args.mode}{"-rex" if args.rex_weight > 0 else ""}{"-irm" if args.irm_weight > 0 else ""}{"-ib" if args.ib_weight > 0 else ""}-finetuning"
     logger = TensorBoardLogger("runs", name=experiment_name, default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(

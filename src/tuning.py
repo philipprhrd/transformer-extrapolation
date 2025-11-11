@@ -42,6 +42,8 @@ def get_args_parser():
     # IB IRM
     parser.add_argument("--ib", action="store_true", help="Use IB for training")
 
+    parser.add_argument("--comment", type=str)
+
     parser.add_argument("--custom", type=str, default=None, help="Use custom split from file")
 
     parser.add_argument("--sampler", type=str, choices=["TPESampler", "GPSampler"], default="TPESampler", help="Optuna sampler")
@@ -78,7 +80,8 @@ def objective(trial: optuna.trial.Trial) -> float:
         irm_weight=irm_weight,
         ib_weight=ib_irm_weight,
         irm_penalty_anneal_iters=280,
-        ib_penalty_anneal_iters=280
+        ib_penalty_anneal_iters=280,
+        coeffs=[0.0, 0.0, -1.0]
     )
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
@@ -131,7 +134,7 @@ if __name__ == "__main__":
         direction="minimize",
         sampler=sampler,
         pruner=pruner,
-        study_name=f"{args.data}-{args.mode}{'-rex' if args.rex else ''}{'-irm' if args.irm else ''}{'-ib' if args.ib else ''}-hyperparam"
+        study_name=f"{args.data}-{args.mode}{"-rex" if args.rex else ""}{"-irm" if args.irm else ""}{"-ib" if args.ib else ""}-hyperparam-{args.comment}"
     )
 
     study.optimize(objective, n_trials=100)

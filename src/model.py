@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import Optional, cast, List
+import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 import torch
 import pytorch_lightning as pl
 from torch import Tensor, nn, optim
-from rtdl_revisiting_models import FTTransformer, LinearEmbeddings, CategoricalEmbeddings, MultiheadAttention, _named_sequential, _ReGLU
+from rtdl_revisiting_models import FTTransformer, LinearEmbeddings, CategoricalEmbeddings, MultiheadAttention, _named_sequential, _ReGLU, _INTERNAL_ERROR, _CLSEmbedding
 from .algorithms import BaseAlgorithm, ErmAlgorithm, RExAlgorithm, IBIRMAlgorithm
 
 @dataclass
@@ -26,36 +28,41 @@ class FTConfig():
     irm_penalty_anneal_iters: int = 100
     ib_penalty_anneal_iters: int = 100
 
-class PolynomActivation(nn.Module):
-    def __init__(self, coeffs):
-        super().__init__()
-        self.coeffs = nn.Parameter(torch.tensor(coeffs, dtype=torch.float32))
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        result = torch.zeros_like(x)
-        for power, coeff in enumerate(self.coeffs):
-            result += coeff * (x ** power)
-        return result
-
 class OwnFeatureTokenizerBackbone(nn.Module):
     def __init__(
         self,
-        *,
         d_out: Optional[int],
         n_blocks: int,
         d_block: int,
         attention_n_heads: int,
         attention_dropout: float,
-        ffn_d_hidden: Optional[int] = None,
-        ffn_d_hidden_multiplier: Optional[float],
         ffn_dropout: float,
-        n_tokens: Optional[int] = None,
-        ffn_activation = 'ReGLU',
         residual_dropout: float,
-        coeffs
+        coeffs,
+        ffn_activation = 'reglu',
+        ffn_d_hidden: Optional[int] = None,
+        n_tokens: Optional[int] = None,
+        ffn_d_hidden_multiplier: Optional[int] = None
     ):
         super().__init__()
-        ffn_use_reglu = ffn_activation == 'ReGLU'
+
+        if ffn_d_hidden is None:
+            if ffn_d_hidden_multiplier is None:
+                raise ValueError(
+                    'If ffn_d_hidden is None,'
+                    ' then ffn_d_hidden_multiplier must not be None'
+                )
+            ffn_d_hidden = int(d_block * cast(float, ffn_d_hidden_multiplier))
+        else:
+            if ffn_d_hidden_multiplier is not None:
+                raise ValueError(
+                    'If ffn_d_hidden is not None,'
+                    ' then ffn_d_hidden_multiplier must be None'
+                )
+        
+        self.d_block = d_block
+
+        ffn_use_reglu = ffn_activation == 'reglu'
         self.blocks = nn.ModuleList(
             [
                 nn.ModuleDict(
@@ -79,7 +86,7 @@ class OwnFeatureTokenizerBackbone(nn.Module):
                                     d_block, ffn_d_hidden * (2 if ffn_use_reglu else 1)
                                 ),
                             ),
-                            ('activation', _ReGLU() if ffn_use_reglu else PolynomActivation(coeffs)),
+                            ('activation', _ReGLU() if ffn_use_reglu else nn.ReLU()),
                             ('dropout', nn.Dropout(ffn_dropout)),
                             ('linear2', nn.Linear(ffn_d_hidden, d_block)),
                         ),
@@ -148,29 +155,30 @@ class FeatureTokenizerTransformer(pl.LightningModule):
 
         self.save_hyperparameters()
 
+        self.backbone = OwnFeatureTokenizerBackbone(
+            n_tokens=(None),
+            n_blocks=config.n_blocks,
+            d_out=config.d_out,
+            coeffs=config.coeffs,
+            d_block = [96, 128, 192, 256, 320, 384][config.n_blocks - 1],
+            attention_n_heads=8,
+            attention_dropout=[0.1, 0.15, 0.2, 0.25, 0.3, 0.35][config.n_blocks - 1],
+            ffn_dropout=[0.0, 0.05, 0.1, 0.15, 0.2, 0.25][config.n_blocks - 1],
+            residual_dropout=0.0,
+            ffn_d_hidden_multiplier = 4 / 3,
+            ffn_activation="snake"
+        )
+
+        self.cls_embedding = _CLSEmbedding(self.backbone.d_block)
+
         self.cont_embeddings = (
-            LinearEmbeddings(config.n_cont_features, config.n_blocks) if config.n_cont_features > 0 else None
+            LinearEmbeddings(config.n_cont_features, self.backbone.d_block) if config.n_cont_features > 0 else None
         )
         self.cat_embeddings = (
-            CategoricalEmbeddings(config.cat_cardinalities, config.n_blocks, True)
+            CategoricalEmbeddings(config.cat_cardinalities, self.backbone.d_block, True)
             if config.cat_cardinalities
             else None
         )
-
-        self.backbone = OwnFeatureTokenizerBackbone(
-            n_tokens=(
-                None
-            ),
-        )
-
-        #default_kwargs = FTTransformer.get_default_kwargs(n_blocks=config.n_blocks)
-
-        #self.model = FTTransformer(
-        #    n_cont_features=config.n_cont_features,
-        #    cat_cardinalities=config.cat_cardinalities,
-        #    d_out=config.d_out,
-        #    **default_kwargs
-        #)
 
         self.register_buffer("update_count", torch.tensor(0))
         
@@ -194,7 +202,7 @@ class FeatureTokenizerTransformer(pl.LightningModule):
         else:  # Default to ERM
             return ErmAlgorithm()
 
-    def forward(self, X_cont, X_cat):
+    def forward(self, x_cont, x_cat):
         """Do the forward pass."""
         x_any = x_cat if x_cont is None else x_cont
         if x_any is None:
@@ -230,11 +238,7 @@ class FeatureTokenizerTransformer(pl.LightningModule):
     
     def forward_with_features(self, X_cont, X_cat):
         """Forward pass that also returns intermediate features for IB_IRM"""
-        # This is a simplified feature extraction
-        # In practice, you might want to access intermediate layers of the transformer
-        predictions = self.model(X_cont, X_cat)
-        # For now, use the predictions as features (this should be improved)
-        # In a real implementation, you'd extract features from before the final layer
+        predictions = self.forward(X_cont, X_cat)
         features = predictions.detach()
         return predictions, features
     
@@ -245,21 +249,19 @@ class FeatureTokenizerTransformer(pl.LightningModule):
         """Standard training step using the configured algorithm"""
         X_cont, X_cat, y, e = batch
         
-        # Get features for algorithms that need them (like IB_IRM)
+
         if self.config.ib_weight > 0:
             predictions, features = self.forward_with_features(X_cont, X_cat)
         else:
             predictions = self.forward(X_cont, X_cat)
             features = None
         
-        # Compute loss using the algorithm
         if isinstance(self.algorithm, RExAlgorithm):
             loss = self.algorithm.compute_loss(
                 predictions, y, e, self.loss_fn, 
                 self.update_count.item()
             )
             
-            # Compute and log penalty terms
             penalty = self.algorithm.compute_penalty(
                 predictions, y, e, self.loss_fn
             )
@@ -269,7 +271,6 @@ class FeatureTokenizerTransformer(pl.LightningModule):
                 self.update_count.item(), features=features
             )
             
-            # Compute and log penalty terms
             penalty = self.algorithm.compute_penalty(
                 predictions, y, e, self.loss_fn, features=features
             )
@@ -309,7 +310,7 @@ class FeatureTokenizerTransformer(pl.LightningModule):
             print(f"Algorithm penalty anneal iters reached. Resetting optimizer")
             self.trainer.optimizers = [
                 optim.AdamW(
-                    self.model.make_parameter_groups(), 
+                    self.parameters(), 
                     lr=self.config.lr, 
                     weight_decay=self.config.weight_decay
                 )
@@ -317,6 +318,6 @@ class FeatureTokenizerTransformer(pl.LightningModule):
     
     def configure_optimizers(self):
         return optim.AdamW(
-            self.model.make_parameter_groups(), lr=self.config.lr, weight_decay=self.config.weight_decay
+            self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay
         )
     

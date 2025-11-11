@@ -2,7 +2,7 @@ import pandas as pd
 from src.utils import read_data_config, preprocess_data, save_scalers
 
 def main():
-    path = "quad"
+    path = "lin"
     config_path = f"configs/{path}.json"
     data_path = f"data/{path}.csv"
     cont_features, cat_features, labels = read_data_config(config_path)

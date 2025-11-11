@@ -65,13 +65,14 @@ def run(seed, iteration) -> float:
         rex_penalty_anneal_iters=args.rex_anneal_iters,
         irm_weight=args.irm_weight,
         ib_weight=args.ib_weight,
+        coeffs=[0.0, 0.0, 0.0],
         irm_penalty_anneal_iters=args.irm_anneal_iters,
         ib_penalty_anneal_iters=args.ib_anneal_iters
     )
 
     early_stopping = EarlyStopping(monitor="val/loss", patience=args.patience, mode="min")
 
-    study_name = f"{args.data}-{args.mode}{'-rex' if args.rex_weight > 0 else ''}{'-irm' if args.irm_weight > 0 else ''}{'-ib' if args.ib_weight > 0 else ''}-significance"
+    study_name = f"{args.data}-{args.mode}{"-rex" if args.rex_weight > 0 else ""}{"-irm" if args.irm_weight > 0 else ""}{"-ib" if args.ib_weight > 0 else ""}-significance"
     logger = TensorBoardLogger("runs", name=study_name, version=f"seed_{seed}", default_hp_metric=False)
 
     ckpt_cb = ModelCheckpoint(
@@ -94,8 +95,10 @@ def run(seed, iteration) -> float:
     # Training
     trainer.fit(model, dm)
 
+    trainer.test(model, dm)
+
     # Return the best validation loss for optimization
-    return trainer.callback_metrics["val/loss"].item()
+    return trainer.callback_metrics["test/loss"].item()
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
@@ -105,26 +108,26 @@ if __name__ == "__main__":
     cont_features, cat_features, labels = read_data_config(f"configs/{args.data}.json")
     
     comparison_values = [
-14.205209,
-13.597524,
-14.022445,
-13.823618,
-13.576504,
-13.794117,
-14.458971,
-13.920672,
-13.640601,
-14.036467,
-13.494765,
-13.620354,
-13.975441,
-14.038516,
-14.074393,
-13.815199,
-13.848504,
-14.182647,
-13.700654,
-13.643946
+25.4563,
+26.2944,
+25.8014,
+25.8301,
+25.6055,
+25.7635,
+24.9826,
+25.3411,
+25.3445,
+25.7384,
+25.5256,
+25.5783,
+24.5116,
+25.3359,
+25.1724,
+25.4570,
+25.1799,
+24.9801,
+25.6926,
+25.1204
     ]
     
     print("Starting significance testing with 20 iterations...")
@@ -141,7 +144,7 @@ if __name__ == "__main__":
         loss = run(seed=seed, iteration=i)
         loss_values.append(loss)
         
-        print(f"Iteration {i+1} completed with loss: {loss:.6f}")
+        print(f"Iteration {i+1} completed with loss: {loss:.4f}")
 
     print("\n" + "="*60)
     print("RESULTS SUMMARY")
@@ -149,21 +152,21 @@ if __name__ == "__main__":
     print(f"Number of iterations completed: {len(loss_values)}")
     print("\nAll loss values:")
     for i, loss in enumerate(loss_values):
-        print(f"{loss:.6f}")
+        print(f"{loss:.4f}")
     
     print(f"\nStatistics:")
-    print(f"  Mean loss: {sum(loss_values)/len(loss_values):.6f}")
-    print(f"  Min loss:  {min(loss_values):.6f}")
-    print(f"  Max loss:  {max(loss_values):.6f}")
-    print(f"  Std dev:   {(sum([(x - sum(loss_values)/len(loss_values))**2 for x in loss_values])/len(loss_values))**0.5:.6f}")
+    print(f"  Mean loss: {sum(loss_values)/len(loss_values):.4f}")
+    print(f"  Min loss:  {min(loss_values):.4f}")
+    print(f"  Max loss:  {max(loss_values):.4f}")
+    print(f"  Std dev:   {(sum([(x - sum(loss_values)/len(loss_values))**2 for x in loss_values])/len(loss_values))**0.5:.4f}")
     
     # T-Test durchführen, falls Vergleichswerte vorhanden sind
     if comparison_values:
         print(f"\nT-Test Analysis:")
         print("-" * 40)
         t_statistic, p_value = stats.ttest_ind(loss_values, comparison_values)
-        print(f"  T-statistic: {t_statistic:.6f}")
-        print(f"  P-value:     {p_value:.6f}")
+        print(f"  T-statistic: {t_statistic:.4f}")
+        print(f"  P-value:     {p_value:.4f}")
         print(f"  Comparison values count: {len(comparison_values)}")
         print(f"  Current values count:    {len(loss_values)}")
         
@@ -177,6 +180,6 @@ if __name__ == "__main__":
         print(f"\nT-Test Analysis:")
         print("-" * 40)
         print("  No comparison values provided - t-test skipped")
-        print("  To perform t-test, add values to 'comparison_values' list")
+        print("  To perform t-test, add values to comparison_values list")
     
     print("="*60)

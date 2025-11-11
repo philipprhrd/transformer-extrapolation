@@ -124,14 +124,14 @@ def save_scalers(feature_transformer, label_transformer, cat_encoders, save_dir:
     # Save feature scaler
     if feature_transformer is not None:
         joblib.dump(feature_transformer, os.path.join(save_dir, "feature_scaler.pkl"))
-        print(f"Saved feature scaler to {os.path.join(save_dir, 'feature_scaler.pkl')}")
+        print(f"Saved feature scaler to {os.path.join(save_dir, "feature_scaler.pkl")}")
     
     # Save label scaler
     if label_transformer is not None:
         joblib.dump(label_transformer, os.path.join(save_dir, "label_scaler.pkl"))
-        print(f"Saved label scaler to {os.path.join(save_dir, 'label_scaler.pkl')}")
+        print(f"Saved label scaler to {os.path.join(save_dir, "label_scaler.pkl")}")
     
     # Save categorical encoders
     if cat_encoders is not None and len(cat_encoders) > 0:
         joblib.dump(cat_encoders, os.path.join(save_dir, "cat_encoders.pkl"))
-        print(f"Saved categorical encoders to {os.path.join(save_dir, 'cat_encoders.pkl')}")
+        print(f"Saved categorical encoders to {os.path.join(save_dir, "cat_encoders.pkl")}")
